@@ -1,0 +1,7 @@
+# Neovim state that is machine-local, not configuration.
+# lazy-lock.json is deliberately NOT ignored: it pins plugin versions, which is
+# what makes a cloned config reproduce this exact setup.
+spell/
+shada/
+*.shada
+.netrwhist
