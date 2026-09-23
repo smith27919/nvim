@@ -25,12 +25,6 @@ vim.opt.colorcolumn = "90"      -- width marker
 vim.opt.signcolumn = "yes"      -- always show gutter
 vim.opt.scrolloff = 8           -- context lines around cursor
 
--- colors: the workstation uses amber, other machines use catppuccin
--- (see lua/ian/plugins/colors.lua)
-if vim.uv.os_gethostname() == "dell-fedora-workstation" then
-    vim.cmd.colorscheme("amber")
-end
-
 -- behavior
 vim.opt.undofile = true     -- persistent undo
 vim.opt.hlsearch = true     -- highlight search matches

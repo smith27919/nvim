@@ -5,3 +5,8 @@ spell/
 shada/
 *.shada
 .netrwhist
+
+# Machine-local: colors, overrides, and the lua/<username> link.
+colors/
+lua/*
+!lua/core/

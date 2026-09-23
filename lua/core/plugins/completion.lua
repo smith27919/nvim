@@ -27,6 +27,9 @@ return {
       sources = {
         default = { "lsp", "path", "snippets", "buffer" },
       },
+      -- The fast Rust matcher has builds for Linux, macOS, Windows,
+      -- FreeBSD, and OpenBSD. Elsewhere (NetBSD) use Lua with no warning.
+      fuzzy = { implementation = "prefer_rust" },
     },
   },
 }

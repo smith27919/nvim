@@ -1,3 +1,7 @@
+-- The first part of this module's name: the username link, or "core".
+local ns = (...):match("^[^.]+")
+local config = vim.fn.stdpath("config")
+
 -- Bootstrap lazy.nvim. Clones it on first start if it is not installed.
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not (vim.uv or vim.loop).fs_stat(lazypath) then
@@ -20,8 +24,10 @@ vim.opt.rtp:prepend(lazypath)
 
 require("lazy").setup({
   spec = {
-    -- Loads every file in lua/ian/plugins/
-    { import = "ian.plugins" },
+    -- Loads every file in lua/core/plugins/
+    { import = ns .. ".plugins" },
+    -- Machine-local plugins, such as a colorscheme. Git ignores this folder.
+    vim.uv.fs_stat(config .. "/lua/overrides/plugins") and { import = "overrides.plugins" } or {},
   },
   install = { colorscheme = { "habamax" } },
   checker = { enabled = true, notify = false },
