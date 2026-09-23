@@ -3,12 +3,18 @@
 # Mason installs the language servers itself, but many of them need a
 # toolchain (go, dotnet, ruby, ...) that only dnf can supply.
 #
-# The script checks each group, lists what is missing, and asks before
-# it installs anything. Run it again at any time; it skips what is there.
+# Neovim runs this once after each git pull (see lua/ian/deps.lua).
+#   install-deps.sh           list what is missing, ask, install
+#   install-deps.sh --check   no output; exit 1 if anything is missing
 
 set -euo pipefail
 
+check_only=false
+[ "${1:-}" = "--check" ] && check_only=true
+
 if ! command -v dnf >/dev/null 2>&1; then
+  # Not Fedora: nothing this script can do, so do not nag on startup.
+  $check_only && exit 0
   echo "This script is for Fedora (dnf). Stopping."
   exit 1
 fi
@@ -46,18 +52,22 @@ for group in "${groups[@]}"; do
   done
 
   if [ ${#missing[@]} -eq 0 ]; then
-    echo "[ok]      $label"
+    $check_only || echo "[ok]      $label"
     continue
   fi
 
+  $check_only && exit 1
+
   echo "[missing] $label: ${missing[*]}"
   echo "          Needed by: $needed_by"
-  read -r -p "          Install? [Y/n] " answer < /dev/tty
+  read -r -p "          Install? [Y/n] " answer
   case "$answer" in
     [nN]*) echo "          Skipped." ;;
     *) to_install+=("${missing[@]}") ;;
   esac
 done
+
+$check_only && exit 0
 
 if [ ${#to_install[@]} -eq 0 ]; then
   echo
@@ -66,14 +76,9 @@ else
   echo
   echo "Installing: ${to_install[*]}"
   sudo dnf install -y "${to_install[@]}"
+  echo
+  echo "Restart Neovim. Mason then installs the servers that needed these tools."
 fi
 
 echo
-read -r -p "Install and update Neovim plugins now? [Y/n] " answer < /dev/tty
-case "$answer" in
-  [nN]*) ;;
-  *) nvim --headless "+Lazy! sync" +qa ;;
-esac
-
-echo
-echo "Done. Open Neovim and type :Mason to see the servers install."
+read -r -p "Press Enter to close." _
