@@ -6,6 +6,8 @@ It works on Linux, FreeBSD, OpenBSD, and NetBSD.
 - **Plugins:** lazy.nvim
 - **Language servers:** Mason, or the system packages on the BSDs
 - **Completion:** blink.cmp, which you can turn off while you learn
+- **Formatting:** conform.nvim, off until you turn it on
+- **Shortcut help:** which-key shows the next keys when you push Space
 - **Search:** Telescope
 - **Syntax colors:** nvim-treesitter
 
@@ -44,6 +46,27 @@ At the first start:
 - Mason installs the language servers. Type `:Mason` to see the progress.
 - If system packages are missing, a split opens at the bottom and asks
   to install them. When the install is done, restart Neovim.
+
+## Updates
+
+When Neovim starts, it checks the repo on GitHub in the background. If there are new
+commits, you see this line:
+
+```
+Config update available (1 new commit): run :ConfigUpdate
+```
+
+| Command | Action |
+| --- | --- |
+| `:ConfigUpdate` | Pull the new commits and update the plugins. Then restart Neovim. |
+| `:Deps` | Check for missing system packages, and install them |
+| `:Mason` | Show the language servers and formatters |
+| `:Lazy` | Show the plugins |
+
+`:ConfigUpdate` resets `lazy-lock.json` before the pull, because Neovim changes
+that file by itself. If you changed any other file in the repo, `:ConfigUpdate`
+stops and lists the files. Your changes are not lost. Put your own settings in
+`lua/overrides/` (see below), so updates never touch them.
 
 ## Your folder
 
@@ -89,8 +112,7 @@ asks before it installs anything.
 
 - Neovim runs the check once after each new commit or `git pull`. The check runs in
   the background. If nothing is missing, you see nothing.
-- To run the check again, delete `~/.local/state/nvim/deps-checked`, or
-  run the script yourself: `~/.config/nvim/scripts/install-deps.sh`
+- To run the check again, type `:Deps` in Neovim.
 - The script uses `sudo`. If `sudo` is not installed, it uses `doas`, and then `su`.
 - The script installs one group at a time. If one group fails, the other groups
   continue.
@@ -115,10 +137,10 @@ If a system has no package for a group, the script shows `[n/a]` and skips it.
   Linux, macOS, and Windows, so Mason skips them on the BSDs. The script installs
   the ones that the BSD package collection has:
   - FreeBSD: clangd (from `llvm`), lua-language-server, rust-analyzer, zls,
-    terraform-ls, neocmakelsp
+    terraform-ls, neocmakelsp, shfmt
   - OpenBSD: clangd (from `clang-tools-extra`), lua-language-server,
-    rust-analyzer, terraform-ls
-  - NetBSD: clangd (from `clang-tools-extra`)
+    rust-analyzer, terraform-ls, shfmt
+  - NetBSD: clangd (from `clang-tools-extra`), shfmt
 
   Neovim enables each server in the list whose command is on the PATH.
 - **Commands with a version in the name.** OpenBSD installs `ruby34`, `erl28`,
@@ -146,6 +168,7 @@ These languages have no server in this config:
 ## Keyboard shortcuts
 
 The leader key is **Space**. For example, `<leader>ff` means push Space, then `f`, then `f`.
+If you push Space and wait, a popup shows the keys you can push next.
 
 To search all shortcuts from Neovim, push `<leader>fkm`.
 
@@ -198,6 +221,18 @@ In a Telescope window:
 `<leader>tc` affects all files and all languages. Completion is on again each time
 Neovim starts. To make it start off, set `vim.g.completion_enabled = false` in
 `lua/overrides/init.lua`.
+
+### Formatting
+
+| Keys | Action |
+| --- | --- |
+| `<leader>tf` | Turn format on save off and on. It starts off. |
+| `gq` | Format the selected lines (visual mode), or `gqq` for one line. black (Python) always formats the whole file. |
+
+Formatters: prettier (JavaScript, TypeScript, CSS, HTML, JSON, YAML, Markdown),
+black (Python), and shfmt (shell). Other languages use the language server's
+formatter, when it has one. To make format on save start on, set
+`vim.g.format_on_save = true` in `lua/overrides/init.lua`.
 
 ### Language server (Neovim built-in)
 

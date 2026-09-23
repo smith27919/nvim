@@ -86,11 +86,22 @@ local package_names = {
   ada_ls = "ada-language-server",
 }
 
+-- Formatters for conform.nvim (see format.lua). These are Mason package names.
+local formatters = { "prettier", "black", "shfmt" }
+
 local function install_missing()
+  -- Headless runs (`nvim --headless "+Lazy! sync"`) exit before an install
+  -- can finish, so do not start one.
+  if #vim.api.nvim_list_uis() == 0 then
+    return
+  end
   local registry = require("mason-registry")
   local to_package = require("mason-lspconfig").get_mappings().lspconfig_to_package
+  local names = vim.deepcopy(formatters)
   for _, server in ipairs(servers) do
-    local name = package_names[server] or to_package[server]
+    table.insert(names, package_names[server] or to_package[server])
+  end
+  for _, name in ipairs(names) do
     local ok, pkg = pcall(registry.get_package, name)
     if ok and not pkg:is_installed() and not pkg:is_installing() and supported(pkg) then
       pkg:install()

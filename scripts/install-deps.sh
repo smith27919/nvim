@@ -79,7 +79,7 @@ needed_by() {
     r) echo "r_language_server (builds from source)" ;;
     julia) echo "julials" ;;
     perl) echo "perlnavigator" ;;
-    servers) echo "Servers that Mason has no build for on this system" ;;
+    servers) echo "Servers and formatters that Mason has no build for on this system" ;;
   esac
 }
 
@@ -95,11 +95,12 @@ have_python3() {
 }
 
 # Commands for the "servers" group. Mason has no BSD build for these.
+# shfmt is the shell formatter for format-on-save.
 server_commands() {
   case $PM in
-    pkg) echo "clangd lua-language-server rust-analyzer zls terraform-ls neocmakelsp" ;;
-    pkg_add) echo "clangd lua-language-server rust-analyzer terraform-ls" ;;
-    pkgin) echo "clangd" ;;
+    pkg) echo "clangd lua-language-server rust-analyzer zls terraform-ls neocmakelsp shfmt" ;;
+    pkg_add) echo "clangd lua-language-server rust-analyzer terraform-ls shfmt" ;;
+    pkgin) echo "clangd shfmt" ;;
     *) echo "" ;;
   esac
 }
@@ -205,9 +206,9 @@ packages() {
     pkg_add:perl) echo "" ;;
     *:perl) echo "perl" ;;
 
-    pkg:servers) echo "llvm lua-language-server rust-analyzer zls terraform-ls neocmakelsp" ;;
-    pkg_add:servers) echo "clang-tools-extra lua-language-server rust-analyzer terraform-ls" ;;
-    pkgin:servers) echo "clang-tools-extra" ;;
+    pkg:servers) echo "llvm lua-language-server rust-analyzer zls terraform-ls neocmakelsp shfmt" ;;
+    pkg_add:servers) echo "clang-tools-extra lua-language-server rust-analyzer terraform-ls shfmt" ;;
+    pkgin:servers) echo "clang-tools-extra shfmt" ;;
     *:servers) echo "" ;;
   esac
 }
