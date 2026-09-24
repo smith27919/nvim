@@ -102,6 +102,14 @@ function M.open_installer(commit)
       end
     end,
   })
+  -- Lazy can open its window after the installer. Close it too.
+  vim.api.nvim_create_autocmd("FileType", {
+    group = group,
+    pattern = "lazy",
+    callback = function()
+      vim.schedule(close_lazy)
+    end,
+  })
   -- Another window took the focus. Take it back.
   vim.api.nvim_create_autocmd("WinEnter", {
     group = group,
