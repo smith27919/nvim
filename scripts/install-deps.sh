@@ -11,6 +11,7 @@
 # Neovim runs this once after each git pull (see lua/core/deps.lua).
 #   install-deps.sh           list what is missing, ask, install
 #   install-deps.sh --check   no output; exit 1 if anything is missing
+# Inside Neovim, exit 10 after an install means "restart Neovim now".
 
 set -eu
 
@@ -361,10 +362,28 @@ else
   echo
   if [ -n "$failed" ]; then
     echo "Failed:${failed#,}"
+    echo "Restart Neovim to try again."
+  else
+    # Neovim sets $NVIM in its terminals. There, exit 10 asks Neovim to
+    # restart, so Mason finds the new tools.
+    if [ -n "${NVIM:-}" ]; then
+      printf "Restart Neovim now? Mason then installs the servers that needed these tools. [Y/n] "
+      read -r answer
+      case "$answer" in
+        [nN]*) exit 0 ;;
+        *) exit 10 ;;
+      esac
+    fi
+    echo "Restart Neovim. Mason then installs the servers that needed these tools."
   fi
-  echo "Restart Neovim. Mason then installs the servers that needed these tools."
 fi
 
 echo
 printf "Press Enter to close."
 read -r _
+
+# A failed group must exit non-zero, so Neovim does not mark this commit
+# as checked and asks again on the next start.
+if [ -n "${failed:-}" ]; then
+  exit 1
+fi

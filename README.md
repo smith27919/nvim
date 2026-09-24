@@ -44,8 +44,9 @@ At the first start:
 
 - lazy.nvim installs the plugins.
 - Mason installs the language servers. Type `:Mason` to see the progress.
-- If system packages are missing, a split opens at the bottom and asks
-  to install them. When the install is done, restart Neovim.
+- If system packages are missing, a window opens in the middle of the screen and
+  asks to install them. Type your answers there. When the install is done, it asks
+  to restart Neovim for you.
 
 ## Updates
 
