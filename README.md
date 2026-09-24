@@ -43,10 +43,11 @@ The dependency check installs the rest (see below).
 At the first start:
 
 - lazy.nvim installs the plugins.
-- Mason installs the language servers. Type `:Mason` to see the progress.
-- If system packages are missing, a window opens in the middle of the screen and
-  asks to install them. Type your answers there. When the install is done, it asks
-  to restart Neovim for you.
+- A list of languages opens. Check the ones you want, then push Enter.
+- If a checked language needs system packages, the installer opens and installs
+  them. When the install is done, it asks to restart Neovim for you.
+- Mason installs the language servers for the checked languages. Type `:Mason` to
+  see the progress.
 
 ## Updates
 
@@ -107,13 +108,24 @@ return {
 
 ## Dependency check
 
-`scripts/install-deps.sh` checks for the system packages that the language servers
-need, such as Go, Java, .NET, Ruby, Rust, and R. For each missing group, it
-asks before it installs anything.
+Many language servers need a toolchain from the system, such as Go, Java, .NET,
+Ruby, Rust, or R. At the first start, a list asks which ones you want:
 
-- Neovim runs the check once after each new commit or `git pull`. The check runs in
-  the background. If nothing is missing, you see nothing.
-- To run the check again, type `:Deps` in Neovim.
+| Keys | Action |
+| --- | --- |
+| `j` / `k` | Move |
+| `Space`, `x`, or a click | Check or uncheck |
+| `Enter` | Confirm |
+| `q` | Decide later. Mason installs nothing until you confirm. |
+
+- A checked toolchain that is missing is installed by `scripts/install-deps.sh`.
+- An unchecked toolchain gets no packages, and Mason skips its servers. For example,
+  uncheck R if you do not want its server to build from source.
+- Unchecking an installed toolchain does not remove it.
+- Your choices are saved in `~/.local/state/nvim/deps-choices.json`, outside the
+  repo. To change them, type `:Deps`.
+- After each new commit or `git pull`, Neovim checks again in the background. You see
+  the list again only if a checked toolchain is missing, or the config adds a new one.
 - The script uses `sudo`. If `sudo` is not installed, it uses `doas`, and then `su`.
 - The script installs one group at a time. If one group fails, the other groups
   continue.

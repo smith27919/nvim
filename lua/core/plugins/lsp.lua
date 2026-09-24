@@ -89,17 +89,34 @@ local package_names = {
 -- Formatters for conform.nvim (see format.lua). These are Mason package names.
 local formatters = { "prettier", "black", "shfmt" }
 
+-- The languages you chose in the :Deps picker (see languages.lua).
+local languages = require("core.languages")
+
 local function install_missing()
   -- Headless runs (`nvim --headless "+Lazy! sync"`) exit before an install
   -- can finish, so do not start one.
   if #vim.api.nvim_list_uis() == 0 then
     return
   end
+  -- Before the first choice, install nothing. The picker calls this
+  -- again when you confirm, so an unwanted server never starts to build.
+  local choices = languages.load()
+  if not choices then
+    return
+  end
+  local skip = languages.skipped(choices)
   local registry = require("mason-registry")
   local to_package = require("mason-lspconfig").get_mappings().lspconfig_to_package
-  local names = vim.deepcopy(formatters)
+  local names = {}
+  for _, name in ipairs(formatters) do
+    if not skip[name] then
+      table.insert(names, name)
+    end
+  end
   for _, server in ipairs(servers) do
-    table.insert(names, package_names[server] or to_package[server])
+    if not skip[server] then
+      table.insert(names, package_names[server] or to_package[server])
+    end
   end
   for _, name in ipairs(names) do
     local ok, pkg = pcall(registry.get_package, name)
@@ -139,6 +156,13 @@ return {
       -- The registry is downloaded on the first start, so wait for it.
       require("mason-registry").refresh(vim.schedule_wrap(install_missing))
       enable_from_path()
+      -- The :Deps picker sends this when you confirm your languages.
+      vim.api.nvim_create_autocmd("User", {
+        pattern = "DepsChoices",
+        callback = function()
+          require("mason-registry").refresh(vim.schedule_wrap(install_missing))
+        end,
+      })
     end,
   },
 }

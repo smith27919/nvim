@@ -11,12 +11,30 @@
 # Neovim runs this once after each git pull (see lua/core/deps.lua).
 #   install-deps.sh           list what is missing, ask, install
 #   install-deps.sh --check   no output; exit 1 if anything is missing
+#   install-deps.sh --list    print "group status" lines (ok, missing, na)
+#   --groups "go ruby"        with the above: only core and these groups,
+#                             and install them without asking
 # Inside Neovim, exit 10 after an install means "restart Neovim now".
 
 set -eu
 
 check_only=false
-[ "${1:-}" = "--check" ] && check_only=true
+list_only=false
+only_given=false
+only=""
+while [ $# -gt 0 ]; do
+  case $1 in
+    --check) check_only=true ;;
+    --list) list_only=true ;;
+    --groups)
+      only_given=true
+      only=${2:-}
+      [ $# -gt 1 ] && shift
+      ;;
+  esac
+  shift
+done
+$list_only && check_only=true
 
 have() {
   for cmd in "$@"; do
@@ -69,8 +87,8 @@ label() {
 needed_by() {
   case $1 in
     core) echo "Neovim plugins, Mason, Telescope" ;;
-    node) echo "Most servers: typescript, html, css, bash, yaml, json, vue, ..." ;;
-    python) echo "pyright, fortls, tclint" ;;
+    node) echo "Most servers: typescript, html, css, pyright, bash, yaml, json, vue, ..." ;;
+    python) echo "fortls, tclint, black" ;;
     go) echo "gopls" ;;
     java) echo "jdtls, kotlin, groovy (javac builds groovy)" ;;
     dotnet) echo "csharp_ls, fsautocomplete" ;;
@@ -305,10 +323,34 @@ link_versioned() {
   esac
 }
 
+# With --groups, core and servers always count, and the rest only if listed.
+wanted() {
+  $only_given || return 0
+  case $1 in core | servers) return 0 ;; esac
+  case " $only " in *" $1 "*) return 0 ;; esac
+  return 1
+}
+
+# The status of each group that you can choose, for the Neovim picker.
+if $list_only; then
+  for group in $DEP_GROUPS; do
+    case $group in core | servers) continue ;; esac
+    if present "$group"; then
+      echo "$group ok"
+    elif [ -z "$(packages "$group")" ]; then
+      echo "$group na"
+    else
+      echo "$group missing"
+    fi
+  done
+  exit 0
+fi
+
 $check_only || echo "Package manager: $PM"
 
 selected=""
 for group in $DEP_GROUPS; do
+  wanted "$group" || continue
   # Only the BSDs need servers from the system packages.
   if [ "$group" = servers ] && [ -z "$(packages servers)" ]; then
     continue
@@ -330,6 +372,11 @@ for group in $DEP_GROUPS; do
 
   echo "[missing] $(label "$group"): $names"
   echo "          Needed by: $(needed_by "$group")"
+  # The Neovim picker has already asked.
+  if $only_given; then
+    selected="$selected $group"
+    continue
+  fi
   printf "          Install? [Y/n] "
   read -r answer
   case "$answer" in
