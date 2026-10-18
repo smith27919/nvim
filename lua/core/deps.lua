@@ -1,4 +1,5 @@
--- Runs scripts/install-deps.sh once after each git pull of this config.
+-- Runs scripts/install-deps.sh (install-deps.ps1 on Windows) once after
+-- each git pull of this config.
 -- The script stays in the repo. A marker file outside the repo holds the
 -- commit that was last checked, so a new commit or pull means a new check.
 --
@@ -10,8 +11,48 @@ local M = {}
 local languages = require("core.languages")
 
 local config = vim.fn.stdpath("config")
-local script = config .. "/scripts/install-deps.sh"
+local windows = vim.fn.has("win32") == 1
+-- Windows cannot run the sh script, so it has a PowerShell twin.
+local script = config .. (windows and "/scripts/install-deps.ps1" or "/scripts/install-deps.sh")
 local marker = vim.fn.stdpath("state") .. "/deps-checked"
+
+-- The command that runs the script with these arguments.
+local function script_cmd(...)
+  local cmd = windows and { "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script }
+    or { script }
+  return vim.list_extend(cmd, { ... })
+end
+
+-- A .ps1 file is not executable for vim.fn.executable(), so check that it exists.
+local function have_script()
+  if windows then
+    return vim.fn.filereadable(script) == 1
+  end
+  return vim.fn.executable(script) == 1
+end
+
+-- Windows: add the PATH entries that winget wrote to the registry, so Mason
+-- finds the new tools without a restart. A restarted Neovim keeps the old
+-- PATH. The current entries stay first, Mason's bin folder among them.
+local function refresh_path()
+  local out = vim.system({ "powershell", "-NoProfile", "-Command",
+    "[Environment]::GetEnvironmentVariable('Path','Machine') + ';' + "
+      .. "[Environment]::GetEnvironmentVariable('Path','User')" }, { text = true }):wait()
+  if out.code ~= 0 then
+    return
+  end
+  local seen, path = {}, vim.env.PATH or ""
+  for dir in path:gmatch("[^;]+") do
+    seen[dir:lower()] = true
+  end
+  for dir in (out.stdout or ""):gmatch("[^;\r\n]+") do
+    if not seen[dir:lower()] then
+      seen[dir:lower()] = true
+      path = path .. ";" .. dir
+    end
+  end
+  vim.env.PATH = path
+end
 
 -- The script exits with this code when you ask it to restart Neovim.
 local RESTART = 10
@@ -135,7 +176,7 @@ function M.open_installer(commit, groups)
     " Type your answer, then push Enter. Ctrl+c stops. ", 24)
   local unguard = guard(win, true)
 
-  vim.fn.jobstart({ script, "--groups", table.concat(groups, " ") }, {
+  vim.fn.jobstart(script_cmd("--groups", table.concat(groups, " ")), {
     term = true,
     on_exit = function(_, code)
       vim.schedule(function()
@@ -157,6 +198,9 @@ function M.open_installer(commit, groups)
             vim.notify("Save your files, then run :restart.", vim.log.levels.WARN)
           end
         else
+          if windows then
+            refresh_path()
+          end
           choices_changed()
         end
       end)
@@ -242,13 +286,13 @@ local function open_picker(commit, statuses)
     end
     languages.save(choices)
     close()
-    if vim.fn.executable(script) == 0 then
+    if not have_script() then
       choices_changed()
       return
     end
     -- Install only if something the checked groups need is missing.
     -- Core tools count too, so this asks the script, not the list above.
-    vim.system({ script, "--check", "--groups", table.concat(checked, " ") }, {}, function(check)
+    vim.system(script_cmd("--check", "--groups", table.concat(checked, " ")), {}, function(check)
       vim.schedule(function()
         if check.code == 0 then
           write_marker(commit)
@@ -291,11 +335,11 @@ function M.open(commit)
     vim.api.nvim_set_current_win(current_win)
     return
   end
-  if vim.fn.executable(script) == 0 then
+  if not have_script() then
     open_picker(commit, {})
     return
   end
-  vim.system({ script, "--list" }, { text = true }, function(list)
+  vim.system(script_cmd("--list"), { text = true }, function(list)
     local statuses = {}
     for id, status in (list.stdout or ""):gmatch("(%S+) (%S+)") do
       statuses[id] = status
@@ -318,11 +362,11 @@ function M.check()
         M.open(commit)
         return
       end
-      if not commit or read_marker() == commit or vim.fn.executable(script) == 0 then
+      if not commit or read_marker() == commit or not have_script() then
         return
       end
       local checked = table.concat(languages.checked(choices), " ")
-      vim.system({ script, "--check", "--groups", checked }, {}, function(check)
+      vim.system(script_cmd("--check", "--groups", checked), {}, function(check)
         vim.schedule(function()
           if check.code == 0 then
             write_marker(commit)

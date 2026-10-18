@@ -1,0 +1,3 @@
+# LF everywhere, also on Windows. A CRLF install-deps.sh does not run on
+# Linux or the BSDs.
+* text=auto eol=lf

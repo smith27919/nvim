@@ -1,7 +1,7 @@
 # Neovim config
 
 A Neovim config with completion and language servers for about 40 languages.
-It works on Linux, FreeBSD, OpenBSD, and NetBSD.
+It works on Linux, FreeBSD, OpenBSD, NetBSD, and Windows 11.
 
 - **Plugins:** lazy.nvim
 - **Language servers:** Mason, or the system packages on the BSDs
@@ -48,6 +48,23 @@ At the first start:
   them. When the install is done, it asks to restart Neovim for you.
 - Mason installs the language servers for the checked languages. Type `:Mason` to
   see the progress.
+
+### Windows
+
+Install Neovim and git with winget, in PowerShell:
+
+```
+winget install --id Neovim.Neovim -e
+winget install --id Git.Git -e
+```
+
+Open a new terminal, so it finds them. Then clone the repo to the Windows config folder:
+
+```
+git clone https://github.com/smith27919/nvim.git $env:LOCALAPPDATA\nvim
+```
+
+Start `nvim`. The first start is the same as above. See "Notes for Windows" below.
 
 ## Updates
 
@@ -118,12 +135,14 @@ Ruby, Rust, or R. At the first start, a list asks which ones you want:
 | `Enter` | Confirm |
 | `q` | Decide later. Mason installs nothing until you confirm. |
 
-- A checked toolchain that is missing is installed by `scripts/install-deps.sh`.
+- A checked toolchain that is missing is installed by `scripts/install-deps.sh`
+  (`scripts/install-deps.ps1` on Windows).
 - An unchecked toolchain gets no packages, and Mason skips its servers. For example,
   uncheck R if you do not want its server to build from source.
 - Unchecking an installed toolchain does not remove it.
 - Your choices are saved in `~/.local/state/nvim/deps-choices.json`, outside the
-  repo. To change them, type `:Deps`.
+  repo (`%LOCALAPPDATA%\nvim-data\deps-choices.json` on Windows). To change them,
+  type `:Deps`.
 - After each new commit or `git pull`, Neovim checks again in the background. You see
   the list again only if a checked toolchain is missing, or the config adds a new one.
 - The script uses `sudo`. If `sudo` is not installed, it uses `doas`, and then `su`.
@@ -141,8 +160,29 @@ The script finds the package manager itself:
 | FreeBSD | pkg |
 | OpenBSD | pkg_add |
 | NetBSD | pkgin |
+| Windows | winget |
 
 If a system has no package for a group, the script shows `[n/a]` and skips it.
+
+### Notes for Windows
+
+- **Folders.** The config is in `%LOCALAPPDATA%\nvim`. Plugins, Mason, and your
+  saved choices are in `%LOCALAPPDATA%\nvim-data`.
+- **Your folder is a junction.** `lua/<username>` is a junction, not a symlink,
+  because a symlink needs Developer Mode.
+- **Administrator prompts.** Some winget installers ask for administrator rights.
+  Accept each prompt.
+- **C compiler.** The Treesitter parsers build with GCC from WinLibs
+  (`BrechtSanders.WinLibs.POSIX.UCRT`).
+- **PowerShell scripts.** Windows blocks `.ps1` scripts by default. Mason runs one
+  for some servers (R, groovy), so they fail. To allow scripts for your user, run
+  `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` in PowerShell.
+- **PATH.** Some installers do not add their `bin` folder to the PATH. The script
+  finds it and adds it to your user PATH.
+- **No restart prompt.** A restarted Neovim keeps the old PATH. After an install,
+  Neovim reads the new PATH, and Mason installs the servers at once. Later, close
+  Neovim and the terminal, then open them again.
+- `<leader>x` does nothing on Windows, because Windows has no execute bit.
 
 ### Notes for the BSDs
 
