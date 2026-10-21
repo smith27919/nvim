@@ -18,6 +18,8 @@
 $ErrorActionPreference = "Continue"
 
 $checkOnly = $false
+# Set when the script started itself with administrator rights (see below).
+$elevated = $false
 $listOnly = $false
 $onlyGiven = $false
 $only = @()
@@ -25,6 +27,7 @@ for ($i = 0; $i -lt $args.Count; $i++) {
   switch ($args[$i]) {
     "--check" { $checkOnly = $true }
     "--list" { $listOnly = $true }
+    "--elevated" { $elevated = $true }
     "--groups" {
       $onlyGiven = $true
       # An empty list can arrive as a missing argument.
@@ -121,6 +124,19 @@ $BinDirs = @{
 $Overrides = @{
   "Microsoft.VisualStudio.2022.BuildTools" =
     "--quiet --wait --norestart --nocache --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+}
+
+function Test-IsAdmin {
+  $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+  return ([Security.Principal.WindowsPrincipal]$id).IsInRole(
+    [Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# True for an administrator account that runs without its admin rights
+# (the normal UAC state). A standard user must type another account's
+# password, and that account has a different user PATH, so do not elevate.
+function Test-CanElevate {
+  return [bool](whoami /groups | Select-String -SimpleMatch "S-1-5-32-544")
 }
 
 function Test-Have($name) {
@@ -292,9 +308,37 @@ $failed = @()
 if ($selected.Count -eq 0) {
   Write-Host ""
   Write-Host "Nothing to install."
+} elseif (-not $elevated -and -not (Test-IsAdmin) -and (Test-CanElevate)) {
+  # Each winget installer asks for administrator rights by itself. Start
+  # this script one time as administrator instead, so you approve one
+  # prompt for all groups. It opens in its own window.
+  Write-Host ""
+  Write-Host "Windows asks one time for administrator rights. Approve the prompt."
+  Write-Host "The installs run in a new window. This window waits for it."
+  $argList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"",
+    "--elevated", "--groups", "`"$($selected -join ' ')`"")
+  try {
+    Start-Process powershell -Verb RunAs -Wait -ArgumentList $argList
+  } catch {
+    Write-Host "No administrator rights were given. Nothing was installed."
+  }
+  # Trust the result, not the exit code of the other window.
+  foreach ($group in $selected) {
+    Repair-Path $group
+    if (-not (Test-Group $group)) { $failed += $Labels[$group] }
+  }
+  Write-Host ""
+  if ($failed.Count -gt 0) {
+    Write-Host ("Failed: " + ($failed -join ", "))
+    Write-Host "Restart Neovim to try again."
+  } else {
+    Write-Host "All tools are installed."
+  }
 } else {
   Write-Host ""
-  Write-Host "Some installers ask for administrator rights. Accept each prompt."
+  if (-not $elevated -and -not (Test-IsAdmin)) {
+    Write-Host "Some installers ask for administrator rights. Accept each prompt."
+  }
   # One group at a time, so one failed package fails only its own group.
   foreach ($group in $selected) {
     Write-Host ""
@@ -310,7 +354,9 @@ if ($selected.Count -eq 0) {
     # Inside Neovim there is no restart here, as there is on Linux: a
     # restarted Neovim keeps the old PATH. deps.lua reads the new PATH and
     # lets Mason install the servers now.
-    if ($env:NVIM) {
+    if ($elevated) {
+      Write-Host "Close this window to go back."
+    } elseif ($env:NVIM) {
       Write-Host "Mason installs the servers that needed these tools now."
       Write-Host "Later, close Neovim and your terminal, then open them again."
     } else {

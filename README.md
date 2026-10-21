@@ -172,8 +172,10 @@ If a system has no package for a group, the script shows `[n/a]` and skips it.
   saved choices are in `%LOCALAPPDATA%\nvim-data`.
 - **Your folder is a junction.** `lua/<username>` is a junction, not a symlink,
   because a symlink needs Developer Mode.
-- **Administrator prompts.** Some winget installers ask for administrator rights.
-  Accept each prompt.
+- **Administrator prompts.** If your account is an administrator account, the script
+  asks one time for administrator rights, and then installs all groups in a new
+  window. Push Enter in that window when it is done. A standard account gets one
+  prompt for each installer that needs administrator rights.
 - **C compiler.** The Treesitter parsers build with GCC from WinLibs
   (`BrechtSanders.WinLibs.POSIX.UCRT`).
 - **Visual Studio C++ tools.** npm builds some servers with node-gyp (for example
