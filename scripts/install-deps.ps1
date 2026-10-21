@@ -280,6 +280,15 @@ if (-not $checkOnly) {
     Write-Host "          some servers (R, groovy). To allow them, run this yourself:"
     Write-Host "          Set-ExecutionPolicy -Scope CurrentUser RemoteSigned"
   }
+  # node-gyp builds deep inside Mason's folder, and some paths there pass
+  # 260 characters (awk_ls). A system setting: tell, do not change it.
+  $fs = Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -ErrorAction SilentlyContinue
+  if (-not $fs -or $fs.LongPathsEnabled -ne 1) {
+    Write-Host "[warning] Long paths are off. Mason cannot build some servers (awk). To"
+    Write-Host "          turn them on, run this yourself in an administrator PowerShell:"
+    Write-Host "          New-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem ``"
+    Write-Host "            LongPathsEnabled -Value 1 -PropertyType DWORD -Force"
+  }
 }
 
 $selected = @()

@@ -182,6 +182,14 @@ If a system has no package for a group, the script shows `[n/a]` and skips it.
   awk_ls), and node-gyp does not use GCC. The Node.js group installs the Visual Studio
   2022 Build Tools with the C++ workload (`Microsoft.VisualStudio.2022.BuildTools`).
   The download is about 3 GB, and the install takes several minutes.
+- **Long paths.** node-gyp builds deep inside Mason's folder, and some paths there
+  are longer than 260 characters (awk_ls). Windows blocks them unless long paths are
+  on. To turn them on, run this in an administrator PowerShell, then start Neovim
+  again:
+
+  ```
+  New-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem LongPathsEnabled -Value 1 -PropertyType DWORD -Force
+  ```
 - **gzip.** Mason unpacks some servers with gzip (for example millet). The core group
   installs `GnuWin32.Gzip`. Do not add Git's `usr\bin` folder to the PATH for its
   gzip: that folder also has a `link.exe` and a `find.exe` that replace the Windows
