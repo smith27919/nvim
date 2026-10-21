@@ -55,12 +55,17 @@ if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
 
 # Each group: the commands it needs, and the winget package for each one.
 # "cc" is any C compiler, for the Treesitter parsers. WinLibs is MinGW-w64 GCC.
+# "gzip": Mason unpacks .gz files with it (millet). Git has a gzip, but its
+# usr\bin folder also has a link.exe and a find.exe, so it stays off the PATH.
+# "msvc": the Visual Studio C++ tools. npm builds some servers with
+# node-gyp (awk_ls), and node-gyp does not use GCC on Windows.
 # A group with one pair needs the leading comma: PowerShell flattens
 # @(@("go", "GoLang.Go")) into @("go", "GoLang.Go").
 $DepGroups = [ordered]@{
   core   = @(@("nvim", "Neovim.Neovim"), @("git", "Git.Git"), @("rg", "BurntSushi.ripgrep.MSVC"),
-             @("cc", "BrechtSanders.WinLibs.POSIX.UCRT"))
-  node   = @(@("node", "OpenJS.NodeJS.LTS"), @("npm", "OpenJS.NodeJS.LTS"))
+             @("cc", "BrechtSanders.WinLibs.POSIX.UCRT"), @("gzip", "GnuWin32.Gzip"))
+  node   = @(@("node", "OpenJS.NodeJS.LTS"), @("npm", "OpenJS.NodeJS.LTS"),
+             @("msvc", "Microsoft.VisualStudio.2022.BuildTools"))
   python = , @("python", "Python.Python.3.13")
   go     = , @("go", "GoLang.Go")
   java   = , @("javac", "EclipseAdoptium.Temurin.21.JDK")
@@ -80,8 +85,8 @@ $Labels = @{
 }
 
 $NeededBy = @{
-  core = "Neovim plugins, Mason, Telescope, Treesitter parsers"
-  node = "Most servers: typescript, html, css, pyright, bash, yaml, json, vue, ..."
+  core = "Neovim plugins, Mason, Telescope, Treesitter parsers, millet (gzip)"
+  node = "Most servers: typescript, html, css, pyright, bash, yaml, json, vue, ...; awk_ls (C++ tools)"
   python = "fortls, tclint, black"
   go = "gopls"
   java = "jdtls, kotlin, groovy (javac builds groovy)"
@@ -107,6 +112,15 @@ $BinDirs = @{
   Rscript = @("$env:ProgramFiles\R\R-*\bin")
   julia   = @("$env:LOCALAPPDATA\Programs\Julia*\bin")
   perl    = @("C:\Strawberry\perl\bin")
+  gzip    = @("${env:ProgramFiles(x86)}\GnuWin32\bin")
+}
+
+# Installer arguments for packages that need more than --silent. The
+# Build Tools install nothing useful without a workload. The 2022 release,
+# because every node-gyp version since 10 finds it.
+$Overrides = @{
+  "Microsoft.VisualStudio.2022.BuildTools" =
+    "--quiet --wait --norestart --nocache --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 }
 
 function Test-Have($name) {
@@ -127,6 +141,14 @@ function Test-Command($name) {
       if (-not (Test-Have "python")) { return $false }
       & python -m venv --help *> $null
       return $LASTEXITCODE -eq 0
+    }
+    "msvc" {
+      # vswhere comes with every Visual Studio install. Ask it for the C++ tools.
+      $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+      if (-not (Test-Path $vswhere)) { return $false }
+      $found = & $vswhere -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+        -property installationPath
+      return [bool]$found
     }
     "ruby" {
       # ruby_lsp builds a native gem, so the headers must exist too.
@@ -190,9 +212,14 @@ function Repair-Path($group) {
 function Install-Group($group) {
   foreach ($id in (Get-MissingPackages $group)) {
     Write-Host "winget install $id"
+    $mode = @("--silent")
+    if ($Overrides.ContainsKey($id)) {
+      $mode = @("--override", $Overrides[$id])
+      Write-Host "          This install is large and takes several minutes."
+    }
     # Out-Host: output that is not sent to the screen becomes part of the
     # return value of this function.
-    & winget install --id $id -e --source winget --silent --disable-interactivity `
+    & winget install --id $id -e --source winget @mode --disable-interactivity `
       --accept-package-agreements --accept-source-agreements | Out-Host
   }
   Repair-Path $group

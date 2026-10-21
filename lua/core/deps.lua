@@ -1,7 +1,8 @@
 -- Runs scripts/install-deps.sh (install-deps.ps1 on Windows) once after
 -- each git pull of this config.
 -- The script stays in the repo. A marker file outside the repo holds the
--- commit that was last checked, so a new commit or pull means a new check.
+-- commit and the checked groups of the last check that passed, so a new
+-- commit, a pull, or a new choice means a new check.
 --
 -- First a picker asks which languages you want (see languages.lua). Then
 -- the script installs the missing toolchains for the checked ones.
@@ -67,14 +68,22 @@ local function read_marker()
   return commit
 end
 
-local function write_marker(commit)
+-- The marker text: the commit, then the checked group ids.
+local function marker_key(commit, groups)
   if not commit then
+    return nil
+  end
+  return commit .. " " .. table.concat(groups, " ")
+end
+
+local function write_marker(key)
+  if not key then
     return
   end
   vim.fn.mkdir(vim.fn.fnamemodify(marker, ":h"), "p")
   local f = io.open(marker, "w")
   if f then
-    f:write(commit, "\n")
+    f:write(key, "\n")
     f:close()
   end
 end
@@ -191,18 +200,30 @@ function M.open_installer(commit, groups)
             vim.log.levels.WARN)
           return
         end
-        -- Mark before the restart, so the new Neovim does not ask again.
-        write_marker(commit)
         if code == RESTART then
+          -- Mark before the restart, so the new Neovim does not ask again.
+          write_marker(marker_key(commit, groups))
           if not pcall(vim.cmd, "restart") then
             vim.notify("Save your files, then run :restart.", vim.log.levels.WARN)
           end
-        else
-          if windows then
-            refresh_path()
-          end
-          choices_changed()
+          return
         end
+        if windows then
+          refresh_path()
+        end
+        choices_changed()
+        -- Do not trust the exit code alone. Mark only if a new check finds
+        -- every tool (2026-10-21: an install that stopped early was marked).
+        vim.system(script_cmd("--check", "--groups", table.concat(groups, " ")), {}, function(check)
+          vim.schedule(function()
+            if check.code == 0 then
+              write_marker(marker_key(commit, groups))
+            else
+              vim.notify("Some tools are still missing. The installer runs again at the next start.",
+                vim.log.levels.WARN)
+            end
+          end)
+        end)
       end)
     end,
   })
@@ -295,7 +316,7 @@ local function open_picker(commit, statuses)
     vim.system(script_cmd("--check", "--groups", table.concat(checked, " ")), {}, function(check)
       vim.schedule(function()
         if check.code == 0 then
-          write_marker(commit)
+          write_marker(marker_key(commit, checked))
           choices_changed()
           vim.notify("Saved your languages. Mason installs their servers now.")
         else
@@ -362,14 +383,15 @@ function M.check()
         M.open(commit)
         return
       end
-      if not commit or read_marker() == commit or not have_script() then
+      local groups = languages.checked(choices)
+      local key = marker_key(commit, groups)
+      if not key or read_marker() == key or not have_script() then
         return
       end
-      local checked = table.concat(languages.checked(choices), " ")
-      vim.system(script_cmd("--check", "--groups", checked), {}, function(check)
+      vim.system(script_cmd("--check", "--groups", table.concat(groups, " ")), {}, function(check)
         vim.schedule(function()
           if check.code == 0 then
-            write_marker(commit)
+            write_marker(key)
           else
             M.open(commit)
           end

@@ -143,8 +143,10 @@ Ruby, Rust, or R. At the first start, a list asks which ones you want:
 - Your choices are saved in `~/.local/state/nvim/deps-choices.json`, outside the
   repo (`%LOCALAPPDATA%\nvim-data\deps-choices.json` on Windows). To change them,
   type `:Deps`.
-- After each new commit or `git pull`, Neovim checks again in the background. You see
-  the list again only if a checked toolchain is missing, or the config adds a new one.
+- After each new commit, `git pull`, or change in `:Deps`, Neovim checks again in the
+  background. You see the list again only if a checked toolchain is missing, or the
+  config adds a new one. An install counts as done only when a new check finds every
+  tool, so an install that stops early runs again at the next start.
 - The script uses `sudo`. If `sudo` is not installed, it uses `doas`, and then `su`.
 - The script installs one group at a time. If one group fails, the other groups
   continue.
@@ -174,6 +176,14 @@ If a system has no package for a group, the script shows `[n/a]` and skips it.
   Accept each prompt.
 - **C compiler.** The Treesitter parsers build with GCC from WinLibs
   (`BrechtSanders.WinLibs.POSIX.UCRT`).
+- **Visual Studio C++ tools.** npm builds some servers with node-gyp (for example
+  awk_ls), and node-gyp does not use GCC. The Node.js group installs the Visual Studio
+  2022 Build Tools with the C++ workload (`Microsoft.VisualStudio.2022.BuildTools`).
+  The download is about 3 GB, and the install takes several minutes.
+- **gzip.** Mason unpacks some servers with gzip (for example millet). The core group
+  installs `GnuWin32.Gzip`. Do not add Git's `usr\bin` folder to the PATH for its
+  gzip: that folder also has a `link.exe` and a `find.exe` that replace the Windows
+  ones.
 - **PowerShell scripts.** Windows blocks `.ps1` scripts by default. Mason runs one
   for some servers (R, groovy), so they fail. To allow scripts for your user, run
   `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` in PowerShell.
