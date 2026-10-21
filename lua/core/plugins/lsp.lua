@@ -153,10 +153,12 @@ return {
     },
     config = function()
       require("mason-lspconfig").setup()
-      -- The registry is downloaded on the first start, so wait for it.
-      require("mason-registry").refresh(vim.schedule_wrap(install_missing))
       enable_from_path()
-      -- The :Deps picker sends this when you confirm your languages.
+      -- deps.lua sends this when the dependency check knows which
+      -- toolchains are ready: at each start, and after the picker or the
+      -- installer. Installs do not start before that, so a server does not
+      -- fail while its toolchain is still being installed.
+      -- The registry is downloaded on the first start, so wait for it.
       vim.api.nvim_create_autocmd("User", {
         pattern = "DepsChoices",
         callback = function()

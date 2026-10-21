@@ -147,6 +147,9 @@ Ruby, Rust, or R. At the first start, a list asks which ones you want:
   background. You see the list again only if a checked toolchain is missing, or the
   config adds a new one. An install counts as done only when a new check finds every
   tool, so an install that stops early runs again at the next start.
+- Mason waits for a checked toolchain that is missing. It installs the servers of
+  that group after the installer has put the toolchain in place, so they do not fail
+  first. The servers of the other groups install at once.
 - The script uses `sudo`. If `sudo` is not installed, it uses `doas`, and then `su`.
 - The script installs one group at a time. If one group fails, the other groups
   continue.

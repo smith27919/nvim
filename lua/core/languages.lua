@@ -91,11 +91,16 @@ function M.checked(choices)
   return ids
 end
 
--- The servers and formatters of the unchecked groups, as a set.
+-- Checked groups whose toolchain is still missing, as { [id] = true }.
+-- deps.lua sets it after each check. Mason waits for these groups, so a
+-- server does not fail before the installer has put its toolchain in place.
+M.unready = {}
+
+-- The servers and formatters of the unchecked and unready groups, as a set.
 function M.skipped(choices)
   local skip = {}
   for _, group in ipairs(M.groups) do
-    if not choices[group.id] then
+    if not choices[group.id] or M.unready[group.id] then
       for _, name in ipairs(group.servers or {}) do
         skip[name] = true
       end

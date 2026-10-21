@@ -172,8 +172,31 @@ local function guard(win, terminal)
 end
 
 -- Tell Mason (see plugins/lsp.lua) to install the servers you allowed.
-local function choices_changed()
+-- statuses is { [id] = "ok" | "missing" | "na" } from `--list`, or nil
+-- when every checked group is known to be ready. Mason waits for the
+-- groups that are "missing".
+local function choices_changed(statuses)
+  local unready = {}
+  for id, status in pairs(statuses or {}) do
+    if status == "missing" then
+      unready[id] = true
+    end
+  end
+  languages.unready = unready
   vim.api.nvim_exec_autocmds("User", { pattern = "DepsChoices" })
+end
+
+-- Ask the script for each group's status, then call done(statuses).
+local function list_statuses(done)
+  vim.system(script_cmd("--list"), { text = true }, function(list)
+    local statuses = {}
+    for id, status in (list.stdout or ""):gmatch("(%S+) (%S+)") do
+      statuses[id] = status
+    end
+    vim.schedule(function()
+      done(statuses)
+    end)
+  end)
 end
 
 -- Run the script in a terminal float for the checked groups. The float
@@ -211,16 +234,17 @@ function M.open_installer(commit, groups)
         if windows then
           refresh_path()
         end
-        choices_changed()
         -- Do not trust the exit code alone. Mark only if a new check finds
         -- every tool (2026-10-21: an install that stopped early was marked).
         vim.system(script_cmd("--check", "--groups", table.concat(groups, " ")), {}, function(check)
           vim.schedule(function()
             if check.code == 0 then
               write_marker(marker_key(commit, groups))
+              choices_changed()
             else
               vim.notify("Some tools are still missing. The installer runs again at the next start.",
                 vim.log.levels.WARN)
+              list_statuses(choices_changed)
             end
           end)
         end)
@@ -350,8 +374,10 @@ local function open_picker(commit, statuses)
   render()
 end
 
--- Ask the script for each group's status, then show the picker.
-function M.open(commit)
+-- Ask the script for each group's status, then show the picker. With
+-- install = true, Mason also installs the servers of the groups that are
+-- ready now, while the picker is open.
+function M.open(commit, install)
   if current_win and vim.api.nvim_win_is_valid(current_win) then
     vim.api.nvim_set_current_win(current_win)
     return
@@ -360,14 +386,11 @@ function M.open(commit)
     open_picker(commit, {})
     return
   end
-  vim.system(script_cmd("--list"), { text = true }, function(list)
-    local statuses = {}
-    for id, status in (list.stdout or ""):gmatch("(%S+) (%S+)") do
-      statuses[id] = status
+  list_statuses(function(statuses)
+    if install then
+      choices_changed(statuses)
     end
-    vim.schedule(function()
-      open_picker(commit, statuses)
-    end)
+    open_picker(commit, statuses)
   end)
 end
 
@@ -379,21 +402,28 @@ function M.check()
     local commit = head.code == 0 and vim.trim(head.stdout) or nil
     vim.schedule(function()
       local choices = languages.load()
-      if not choices or languages.has_new(choices) then
+      if not choices then
+        -- Before the first choice, Mason installs nothing.
         M.open(commit)
+        return
+      end
+      if languages.has_new(choices) then
+        M.open(commit, true)
         return
       end
       local groups = languages.checked(choices)
       local key = marker_key(commit, groups)
       if not key or read_marker() == key or not have_script() then
+        choices_changed()
         return
       end
       vim.system(script_cmd("--check", "--groups", table.concat(groups, " ")), {}, function(check)
         vim.schedule(function()
           if check.code == 0 then
             write_marker(key)
+            choices_changed()
           else
-            M.open(commit)
+            M.open(commit, true)
           end
         end)
       end)
